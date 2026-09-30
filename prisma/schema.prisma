@@ -1,0 +1,109 @@
+// Stories podcast — data model.
+// Episodes are mirrored from YouTube (the show's home) and enriched here with
+// show notes, transcripts, guests and tags that YouTube has no place for.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EpisodeStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+
+model Episode {
+  id        String @id @default(cuid())
+  /// YouTube video id — the join key back to the channel.
+  youtubeId String @unique
+  slug      String @unique
+
+  /// Episode number as the show counts them. Null for trailers and one-offs.
+  number Int?
+
+  title       String
+  /// Short hook used on cards and social previews.
+  blurb       String?
+  /// Description as it appears on YouTube, kept for reference.
+  description String?
+  /// Long-form notes written for the site, Markdown.
+  showNotes   String?
+  transcript  String?
+
+  thumbnailUrl    String?
+  durationSeconds Int     @default(0)
+
+  status      EpisodeStatus @default(PUBLISHED)
+  featured    Boolean       @default(false)
+  publishedAt DateTime
+
+  viewCount Int @default(0)
+  likeCount Int @default(0)
+
+  tags    Tag[]
+  guests  Guest[]
+  chapters Chapter[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([featured])
+}
+
+/// A timestamped moment in an episode. Doubles as the marks on the waveform.
+model Chapter {
+  id            String  @id @default(cuid())
+  episodeId     String
+  episode       Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  startSeconds  Int
+  title         String
+
+  @@unique([episodeId, startSeconds])
+  @@index([episodeId])
+}
+
+model Tag {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  episodes Episode[]
+}
+
+model Guest {
+  id       String    @id @default(cuid())
+  name     String
+  slug     String    @unique
+  bio      String?
+  avatarUrl String?
+  /// { "website": "...", "instagram": "..." }
+  links    Json?
+  episodes Episode[]
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  /// Where the signup happened, e.g. "home" or "episode:the-night-the-river-came-back".
+  source    String?
+  createdAt DateTime @default(now())
+}
+
+/// One row per YouTube sync, so the admin page can show what happened and when.
+model SyncRun {
+  id         String    @id @default(cuid())
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  added      Int       @default(0)
+  updated    Int       @default(0)
+  /// "running" | "ok" | "error"
+  status     String    @default("running")
+  error      String?
+
+  @@index([startedAt(sort: Desc)])
+}
