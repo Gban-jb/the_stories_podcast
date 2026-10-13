@@ -49,6 +49,13 @@ prints a free hosted database and its connection string:
 npx create-db
 ```
 
+On **Supabase**, open your project, click **Connect → ORMs → Prisma**, and copy
+two strings into `.env`:
+
+- `DATABASE_URL` — the transaction pooler, port `6543`. The app uses this.
+- `DIRECT_URL` — the session pooler, port `5432`. Migrations use this, since
+  they can't run through the transaction pooler.
+
 Create the tables:
 
 ```bash
@@ -147,7 +154,8 @@ Vercel is the shortest path. Set these environment variables in the project:
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | Postgres connection string |
+| `DATABASE_URL` | yes | Postgres connection string (Supabase: transaction pooler, port 6543) |
+| `DIRECT_URL` | Supabase | Session pooler, port 5432. Only needed where migrations run |
 | `NEXT_PUBLIC_SITE_URL` | yes | Your real origin, e.g. `https://stories.fm` |
 | `YOUTUBE_API_KEY` | for sync | |
 | `YOUTUBE_CHANNEL_ID` | for sync | |
@@ -156,7 +164,11 @@ Vercel is the shortest path. Set these environment variables in the project:
 | `SYNC_SECRET` | for cron | `openssl rand -base64 32` |
 
 Run `npm run db:deploy` against the production database once before the first
-deploy.
+deploy, and again whenever a new migration lands.
+
+Every table has row level security switched on with no policies. Supabase's
+Data API would otherwise let anyone holding the anon key read the subscriber
+list. Prisma connects as the table owner, so the site isn't affected.
 
 ## Notes on a few decisions
 
@@ -174,4 +186,3 @@ deploy.
 - **Prisma's CLI sits in devDependencies** and `mysql2`/`deepmerge-ts` are pinned
   forward in `overrides`. Both arrive through the CLI, neither is loaded at
   runtime, and pinning them keeps `npm audit` clean without downgrading Prisma.
->>>>>>> f147c7e (Add README, CI and the GitHub templates)
